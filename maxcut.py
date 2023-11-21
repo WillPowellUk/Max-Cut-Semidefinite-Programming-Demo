@@ -65,16 +65,20 @@ def plot_max_cut(edges, cut, runtime):
     ax.set_xlim([min(x for x, _ in layout.values()) - 0.1, max(x for x, _ in layout.values()) + 0.1])
     ax.set_ylim([min(y for _, y in layout.values()) - 0.1, max(y for _, y in layout.values()) + 0.1])
 
-    # Draw the graph
-    colors = ['red' if c == 1 else 'blue' for c in cut]
-    nx.draw(G, pos=layout, node_color=colors, with_labels=True, ax=ax)
+    # Map nodes to colors based on the cut
+    node_colors = ['red' if c == 1 else 'blue' for c in cut]
+    node_color_map = {node: color for node, color in zip(G.nodes(), node_colors)}
 
-    # Drawing a dotted line for the max cut
-    for edge in edges:
-        if cut[edge[0]] != cut[edge[1]]:
-            # This edge is part of the cut, draw a dotted line
-            points = np.array([layout[edge[0]], layout[edge[1]]])
-            plt.plot(points[:, 0], points[:, 1], color='blue')
+    # Draw nodes
+    nx.draw_networkx_nodes(G, pos=layout, node_color=node_colors, ax=ax)
+
+    # Draw edges with color based on the cut
+    for edge in G.edges():
+        edge_color = 'blue' if node_color_map[edge[0]] != node_color_map[edge[1]] else 'black'
+        nx.draw_networkx_edges(G, pos=layout, edgelist=[edge], edge_color=edge_color, ax=ax)
+
+    # Draw node labels
+    nx.draw_networkx_labels(G, pos=layout, ax=ax)
 
     # Add runtime to the plot with padding
     plt.text(0.05, 0.95, f'Runtime: {runtime:.2f}s', transform=ax.transAxes, fontsize=10, verticalalignment='top', bbox=dict(facecolor='white', alpha=0.5, pad=5))
@@ -82,19 +86,20 @@ def plot_max_cut(edges, cut, runtime):
     plt.show()
 
 
+
 if __name__ == "__main__":
     # Nodes and edges
-    num_of_nodes = 8
-    num_of_edges = 16
+    num_of_nodes = 7
+    num_of_edges = 12
 
     # Generate edges for a max cut problem
     edges = generate_edges(num_of_nodes, num_of_edges)
-    print(edges)
+
     # start a timer
     start_time = time.time()
 
     cut = Goemans_Williamson_Max_Cut(edges)
-    
+
     # stop timer and calculate the runtime
     end_time = time.time()
     runtime = end_time - start_time
