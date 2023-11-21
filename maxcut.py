@@ -6,6 +6,7 @@ import random
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 import time
+from itertools import product
 
 
 def generate_edges(num_of_nodes, num_of_edges):
@@ -32,7 +33,7 @@ def Goemans_Williamson_Max_Cut(edges):
     constraints = [X >> 0]  # X is positive semidefinite
     constraints += [X[i, i] == 1 for i in range(num_of_nodes)]  # Diagonals must be 1
 
-    # Objective function (from paper)
+    # Objective function (Q)
     objective = cp.Maximize(sum(0.5 * (1 - X[i, j]) for i, j in edges))
 
     # Solve problem based on objective and constraints
@@ -44,15 +45,46 @@ def Goemans_Williamson_Max_Cut(edges):
     u = np.random.randn(num_of_nodes)
 
     # Project onto the hyperplane and classify
+    # Finding the sqrt of the matrix X produces the vectors of the nodes given by the relaxed problem (P)
     x_projected = sp.linalg.sqrtm(X_solution)
+    print(x_projected)
     cut = np.sign(x_projected @ u)
     cut = cut.real.astype(np.int32)
 
     return cut
 
-def plot_max_cut(edges, cut, runtime):
+
+def brute_force_max_cut(edges):
+    num_of_nodes = max(max(edge) for edge in edges) + 1
+    max_cut_size = 0
+    best_cut = None
+
+    # Iterate over all possible combinations of nodes in two sets
+    for node_assignment in product([0, 1], repeat=num_of_nodes):
+        cut_size = sum(node_assignment[i] != node_assignment[j] for i, j in edges)
+
+        if cut_size > max_cut_size:
+            max_cut_size = cut_size
+            best_cut = node_assignment
+
+    return np.array(best_cut)
+
+
+def calc_num_of_cuts(edges, cut):
+    # Create a map of node to cut value (0 or 1)
+    node_cut_map = {node: cut_val for node, cut_val in enumerate(cut)}
+
+    # Count the number of edges where the nodes have different cut values
+    cut_edge_count = sum(node_cut_map[i] != node_cut_map[j] for i, j in edges)
+    return cut_edge_count
+
+
+def plot_max_cut(edges, cut, runtime, num_of_cuts):
     # Initialize the graph
     G = nx.Graph()
+
+    # Add all nodes explicitly
+    G.add_nodes_from(range(num_of_nodes))
     G.add_edges_from(edges)
 
     # Create a layout for our nodes 
@@ -69,7 +101,7 @@ def plot_max_cut(edges, cut, runtime):
     node_colors = ['red' if c == 1 else 'blue' for c in cut]
     node_color_map = {node: color for node, color in zip(G.nodes(), node_colors)}
 
-    # Draw nodes
+    # Draw nodes, ensuring all are included
     nx.draw_networkx_nodes(G, pos=layout, node_color=node_colors, ax=ax)
 
     # Draw edges with color based on the cut
@@ -80,17 +112,17 @@ def plot_max_cut(edges, cut, runtime):
     # Draw node labels
     nx.draw_networkx_labels(G, pos=layout, ax=ax)
 
-    # Add runtime to the plot with padding
-    plt.text(0.05, 0.95, f'Runtime: {runtime:.2f}s', transform=ax.transAxes, fontsize=10, verticalalignment='top', bbox=dict(facecolor='white', alpha=0.5, pad=5))
-
+    # Add runtime and number of cuts to the plot with padding
+    plt.text(0.05, 0.95, f'Runtime: {runtime:.2f}s\nNum of Cuts: {num_of_cuts}/{len(edges)}', 
+             transform=ax.transAxes, fontsize=10, verticalalignment='top', 
+             bbox=dict(facecolor='white', alpha=0.5, pad=5))
     plt.show()
-
 
 
 if __name__ == "__main__":
     # Nodes and edges
-    num_of_nodes = 7
-    num_of_edges = 12
+    num_of_nodes = 4
+    num_of_edges = 6
 
     # Generate edges for a max cut problem
     edges = generate_edges(num_of_nodes, num_of_edges)
@@ -98,10 +130,13 @@ if __name__ == "__main__":
     # start a timer
     start_time = time.time()
 
-    cut = Goemans_Williamson_Max_Cut(edges)
+    # cut = Goemans_Williamson_Max_Cut(edges)
+    cut = brute_force_max_cut(edges)
 
     # stop timer and calculate the runtime
     end_time = time.time()
     runtime = end_time - start_time
 
-    plot_max_cut(edges, cut, runtime)
+    num_of_cuts = calc_num_of_cuts(edges, cut)
+
+    plot_max_cut(edges, cut, runtime, num_of_cuts)
