@@ -25,7 +25,9 @@ def generate_edges(num_of_nodes, num_of_edges):
     return list(edges)
 
 
-def Goemans_Williamson_Max_Cut(edges):
+def Goemans_Williamson_max_cut(edges):
+    num_of_nodes = max(max(edge) for edge in edges) + 1
+
     # Create a symmetric matrix variable
     X = cp.Variable((num_of_nodes, num_of_nodes), symmetric=True)
 
@@ -47,7 +49,6 @@ def Goemans_Williamson_Max_Cut(edges):
     # Project onto the hyperplane and classify
     # Finding the sqrt of the matrix X produces the vectors of the nodes given by the relaxed problem (P)
     x_projected = sp.linalg.sqrtm(X_solution)
-    print(x_projected)
     cut = np.sign(x_projected @ u)
     cut = cut.real.astype(np.int32)
 
@@ -80,6 +81,8 @@ def calc_num_of_cuts(edges, cut):
 
 
 def plot_max_cut(edges, cut, runtime, num_of_cuts):
+    num_of_nodes = max(max(edge) for edge in edges) + 1
+
     # Initialize the graph
     G = nx.Graph()
 
@@ -119,24 +122,105 @@ def plot_max_cut(edges, cut, runtime, num_of_cuts):
     plt.show()
 
 
-if __name__ == "__main__":
-    # Nodes and edges
-    num_of_nodes = 4
-    num_of_edges = 6
-
-    # Generate edges for a max cut problem
+def measure_runtime_comparison(num_of_nodes, num_of_edges):
     edges = generate_edges(num_of_nodes, num_of_edges)
 
-    # start a timer
-    start_time = time.time()
+    total_brute_force_runtime = 0
+    total_gw_runtime = 0
+    num_runs = 1
 
-    # cut = Goemans_Williamson_Max_Cut(edges)
-    cut = brute_force_max_cut(edges)
+    for _ in range(num_runs):
+        # start_time = time.time()
+        # brute_force_max_cut(edges)
+        # total_brute_force_runtime += time.time() - start_time
+        total_brute_force_runtime = 1
 
-    # stop timer and calculate the runtime
-    end_time = time.time()
-    runtime = end_time - start_time
+        start_time = time.time()
+        Goemans_Williamson_max_cut(edges)
+        total_gw_runtime += time.time() - start_time
 
-    num_of_cuts = calc_num_of_cuts(edges, cut)
+    average_brute_force_runtime = total_brute_force_runtime / num_runs
+    average_gw_runtime = total_gw_runtime / num_runs
 
-    plot_max_cut(edges, cut, runtime, num_of_cuts)
+    return average_brute_force_runtime, average_gw_runtime
+
+
+def plot_complexity_runtime_graph():
+    num_of_nodes = 50
+
+    edge_range = range(2, 300, 2)
+    brute_force_runtimes = []
+    gw_runtimes = []
+
+    for num_of_edges in edge_range:
+        print(f"Processing {num_of_edges} edges...", end='\r')
+        bf_runtime, gw_runtime = measure_runtime_comparison(num_of_nodes, num_of_edges)
+        brute_force_runtimes.append(bf_runtime)
+        gw_runtimes.append(gw_runtime)
+
+    plt.figure(figsize=(10, 6))
+    plt.plot(edge_range, brute_force_runtimes, label='Brute Force', color='red')
+    plt.plot(edge_range, gw_runtimes, label='Goemans-Williamson', color='blue')
+    plt.xlabel('Complexity (Number of Edges)')
+    plt.ylabel('Runtime (seconds)')
+    plt.title('Runtime vs Complexity for Max Cut Problems')
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
+def plot_complexity_runtime_bar_chart():
+    num_of_nodes = 90
+
+    edge_values = [1, 3, 10, 30, 100, 300, 1000, 3000]
+    brute_force_runtimes = []
+    gw_runtimes = []
+
+    for num_of_edges in edge_values:
+        print(f"Processing {num_of_edges} edges...", end='\r')
+        bf_runtime, gw_runtime = measure_runtime_comparison(num_of_nodes, num_of_edges)
+        brute_force_runtimes.append(bf_runtime)
+        gw_runtimes.append(gw_runtime)
+
+    # Create a bar chart
+    bar_width = 0.35
+    index = range(len(edge_values))
+
+    plt.figure(figsize=(12, 6))
+    plt.bar([i - bar_width/2 for i in index], brute_force_runtimes, bar_width, label='Brute Force')
+    plt.bar([i + bar_width/2 for i in index], gw_runtimes, bar_width, label='Goemans-Williamson')
+
+    plt.xlabel('Number of Edges')
+    plt.ylabel('Average Runtime (seconds)')
+    plt.title('Runtime vs Complexity for Different Numbers of Edges')
+    plt.xticks(index, edge_values)
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
+
+if __name__ == "__main__":
+    plot_complexity_runtime_bar_chart()
+
+    # Call the function to plot the graph
+    # plot_complexity_runtime_graph()
+    
+    # # Nodes and edges
+    # num_of_nodes = 4
+    # num_of_edges = 6
+
+    # # Generate edges for a max cut problem
+    # edges = generate_edges(num_of_nodes, num_of_edges)
+
+    # # start a timer
+    # start_time = time.time()
+
+    # # cut = Goemans_Williamson_max_cut(edges)
+    # cut = brute_force_max_cut(edges)
+
+    # # stop timer and calculate the runtime
+    # end_time = time.time()
+    # runtime = end_time - start_time
+
+    # num_of_cuts = calc_num_of_cuts(edges, cut)
+
+    # plot_max_cut(edges, cut, runtime, num_of_cuts)
