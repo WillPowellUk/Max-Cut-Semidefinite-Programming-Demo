@@ -1,27 +1,14 @@
-import matplotlib.pyplot as plt
-import numpy as np
+def main(algorithm='gw', num_of_nodes=10, *args, **kwargs):
+    print(f"Algorithm: {algorithm}")
+    print(f"Number of Nodes: {num_of_nodes}")
 
-# Sample data
-x = np.linspace(1, 10, 100)
-y = np.power(3, x)  # Exponential growth for demonstration
+    # Additional arguments
+    for arg in args:
+        print(f"Additional arg: {arg}")
 
-plt.figure(figsize=(10, 6))
-plt.plot(x, y)
+    # Additional keyword arguments
+    for key, value in kwargs.items():
+        print(f"{key}: {value}")
 
-# Set y-axis to log scale (default base 10)
-plt.yscale('log')
-
-# Get current axis
-ax = plt.gca()
-
-# Get current y-ticks (which are in base 10)
-y_vals = ax.get_yticks()
-
-# Convert y-tick labels to base 3 log
-ax.set_yticklabels([f"{np.log(val)/np.log(3):.2f}" if val > 0 else '0' for val in y_vals])
-
-plt.xlabel('X-axis')
-plt.ylabel('log3(Y-axis)')
-plt.title('Y-axis in log3 Scale')
-plt.grid(True)
-plt.show()
+# Example usage
+main('brute_force', 15, 'extra_arg1', 'extra_arg2', param1='value1', param2='value2')

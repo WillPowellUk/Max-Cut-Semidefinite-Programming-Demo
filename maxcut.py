@@ -185,7 +185,6 @@ def plot_complexity_runtime_graph():
 def plot_complexity_runtime_bar_chart(log3=False):
     max_K = 10
     edge_values = [2**k for k in range(1, max_K + 1)]
-    print(edge_values)
     brute_force_runtimes = []
     gw_runtimes = []
 
@@ -220,9 +219,49 @@ def plot_complexity_runtime_bar_chart(log3=False):
     plt.show()
 
 
-def main():
-    # Nodes and edges
-    num_of_nodes = 10
+def max_cuts_comparison():
+    max_K = 10
+    edge_values = [2**k for k in range(1, max_K + 1)]
+    accuracies = []
+
+    for num_of_edges in edge_values:
+        print(f"Processing {num_of_edges} edges...", end='\r')
+        accuracy_sum = 0
+        run_times = 5
+        for _ in range(run_times):  # Run 10 times for each number of edges
+            num_of_nodes = calc_num_of_nodes_required(num_of_edges)
+            edges = generate_edges(num_of_nodes, num_of_edges)
+            
+            cuts_brute = brute_force_max_cut(edges, num_of_nodes)
+            max_cuts_brute = calc_num_of_cuts(edges, cuts_brute)
+
+            cuts_gw = Goemans_Williamson_max_cut(edges, num_of_nodes)
+            max_cuts_gw = calc_num_of_cuts(edges, cuts_gw)
+
+            # Calculate the accuracy as a percentage
+            accuracy = (max_cuts_gw / max_cuts_brute) * 100
+            accuracy_sum += accuracy
+
+        # Append the average accuracy
+        average_accuracy = accuracy_sum / run_times
+        accuracies.append(average_accuracy)
+
+    # Plotting
+    plt.figure(figsize=(12, 6))
+    plt.plot(edge_values, accuracies, marker='o', linestyle='-', color='b')
+    plt.axhline(y=87, color='r', linestyle='--', label='Minimum Expected Accuracy')
+    plt.xlabel('Number of Edges')
+    plt.ylabel('Accuracy (%)')
+    plt.title('Accuracy of Goemans-Williamson Algorithm Compared to Brute Force')
+    plt.ylim(0, 100)  # Set y-axis limits
+    plt.grid(True)
+    plt.legend()
+    plt.show()
+
+
+
+def main(algorithm='gw', num_of_nodes=10):
+    # calculate number of edges given nodes
     num_of_edges = calc_num_of_edges_required(num_of_nodes)
 
     # Generate edges for a max cut problem
@@ -231,8 +270,10 @@ def main():
     # start a timer
     start_time = time.time()
 
-    # cut = Goemans_Williamson_max_cut(edges)
-    cut = brute_force_max_cut(edges, num_of_nodes)
+    if algorithm == 'gw':
+        cut = Goemans_Williamson_max_cut(edges, num_of_nodes)
+    else:
+        cut = brute_force_max_cut(edges, num_of_nodes)
 
     # stop timer and calculate the runtime
     end_time = time.time()
@@ -244,10 +285,8 @@ def main():
 
 
 if __name__ == "__main__":
-    # main()
-    plot_complexity_runtime_bar_chart(log3=True)
-    
-    # Call the function to plot the graph
-    # plot_complexity_runtime_graph()
+    # main(algorithm='gw', num_of_nodes=50)
+    # plot_complexity_runtime_bar_chart(log3=True)
+    max_cuts_comparison()
     
     
