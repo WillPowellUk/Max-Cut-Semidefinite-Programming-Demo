@@ -80,6 +80,68 @@ def calc_num_of_cuts(edges, cut):
     return cut_edge_count
 
 
+def plot_network(edges):
+    num_of_nodes = max(max(edge) for edge in edges) + 1
+
+    # Initialize the graph
+    G = nx.Graph()
+
+    # Add all nodes explicitly
+    G.add_nodes_from(range(num_of_nodes))
+    G.add_edges_from(edges)
+
+    # Create a layout for our nodes 
+    layout = nx.spring_layout(G)
+
+    # Plot the original network
+    fig, ax = plt.subplots(figsize=(8, 5))
+    plot_graph(G, layout, ax, title='')
+
+    # Apply the cut algorithm
+    cut = brute_force_max_cut(edges, num_of_nodes)
+    num_of_cuts = calc_num_of_cuts(edges, cut)
+
+    # Plot the network after the cut
+    fig, ax = plt.subplots(figsize=(8, 5))
+    plot_cut_graph(G, layout, ax, cut, title='', runtime=10.00, num_of_cuts=num_of_cuts, edges=edges)
+
+def plot_graph(G, layout, ax, title):
+    ax.set_xlim([min(x for x, _ in layout.values()) - 0.1, max(x for x, _ in layout.values()) + 0.1])
+    ax.set_ylim([min(y for _, y in layout.values()) - 0.1, max(y for _, y in layout.values()) + 0.1])
+    nx.draw_networkx_edges(G, pos=layout, edge_color='black', ax=ax)
+    nx.draw_networkx_nodes(G, pos=layout, node_color='black', node_size=300, ax=ax)
+    nx.draw_networkx_labels(G, pos=layout, font_color='white', ax=ax)
+    ax.set_title(title)
+    plt.show()
+
+def plot_cut_graph(G, layout, ax, cut, title, runtime, num_of_cuts, edges):
+    # Map nodes to colors based on the cut
+    node_colors = ['red' if c == 1 else 'blue' for c in cut]
+    node_color_map = {node: color for node, color in zip(G.nodes(), node_colors)}
+
+    ax.set_xlim([min(x for x, _ in layout.values()) - 0.1, max(x for x, _ in layout.values()) + 0.1])
+    ax.set_ylim([min(y for _, y in layout.values()) - 0.1, max(y for _, y in layout.values()) + 0.1])
+
+    # Draw edges with color based on the cut
+    for edge in G.edges():
+        edge_color = 'blue' if node_color_map[edge[0]] != node_color_map[edge[1]] else 'black'
+        nx.draw_networkx_edges(G, pos=layout, edgelist=[edge], edge_color=edge_color, ax=ax)
+
+    # Draw nodes
+    nx.draw_networkx_nodes(G, pos=layout, node_color=node_colors, node_size=300, ax=ax)
+
+    # Draw node labels
+    nx.draw_networkx_labels(G, pos=layout, font_color='white', ax=ax)
+
+    # Add runtime and number of cuts to the plot with padding
+    plt.text(0.05, 0.95, f'Runtime: {runtime:.2f}s\nNum of Cuts: {num_of_cuts}/{len(edges)}', 
+             transform=ax.transAxes, fontsize=10, verticalalignment='top', 
+             bbox=dict(facecolor='white', alpha=0.5, pad=5))
+
+    ax.set_title(title)
+    plt.show()
+
+
 def plot_max_cut(edges, cut, runtime, num_of_cuts):
     num_of_nodes = max(max(edge) for edge in edges) + 1
 
@@ -143,8 +205,10 @@ def measure_runtime_comparison(num_of_nodes, num_of_edges):
 
     return average_brute_force_runtime, average_gw_runtime
 
+
 def calc_num_of_edges_required(num_of_nodes):
     return int(np.ceil(((num_of_nodes)*(num_of_nodes-1))/2))
+
 
 def calc_num_of_nodes_required(num_of_edges):
     # Coefficients for the quadratic equation
@@ -160,6 +224,7 @@ def calc_num_of_nodes_required(num_of_edges):
 
     # Since number of nodes must be an integer, round up to the nearest integer
     return int(np.ceil(num_of_nodes))
+
 
 def plot_complexity_runtime_graph():
     edge_range = range(2, 150, 5)
@@ -182,37 +247,47 @@ def plot_complexity_runtime_graph():
     plt.grid(True)
     plt.show()
 
+
 def plot_complexity_runtime_bar_chart(log3=False):
-    max_K = 10
+    max_K = 5
     edge_values = [2**k for k in range(1, max_K + 1)]
     brute_force_runtimes = []
     gw_runtimes = []
+    num_iterations = 10  # Number of times to run each edge calculation
 
     for num_of_edges in edge_values:
-        print(f"Processing {num_of_edges} edges...", end='\r')
-        bf_runtime, gw_runtime = measure_runtime_comparison(calc_num_of_nodes_required(num_of_edges), num_of_edges)
-        brute_force_runtimes.append(bf_runtime)
-        gw_runtimes.append(gw_runtime)
+        print(f"Processing {num_of_edges} edges...")
+        bf_runtime_total, gw_runtime_total = 0, 0
+
+        for _ in range(num_iterations):
+            bf_runtime, gw_runtime = measure_runtime_comparison(calc_num_of_nodes_required(num_of_edges), num_of_edges)
+            bf_runtime_total += bf_runtime
+            gw_runtime_total += gw_runtime
+
+        # Calculate the average runtime over the iterations
+        brute_force_runtimes.append(bf_runtime_total / num_iterations)
+        gw_runtimes.append(gw_runtime_total / num_iterations)
 
     bar_width = 0.35
-    index = range(len(edge_values))
+    index = np.array(range(len(edge_values)))
 
     plt.figure(figsize=(12, 6))
-    plt.bar([i - bar_width/2 for i in index], brute_force_runtimes, bar_width, label='Brute Force')
-    plt.bar([i + bar_width/2 for i in index], gw_runtimes, bar_width, label='Goemans-Williamson')
+    plt.bar(index - bar_width/2, brute_force_runtimes, bar_width, label='Brute Force')
+    plt.bar(index + bar_width/2, gw_runtimes, bar_width, label='Goemans-Williamson')
+
+    # Adding trend lines for Brute Force and GW methods
+    plt.plot(index - bar_width/2, brute_force_runtimes, label='Brute Force Trend', color='blue', marker='o')
+    plt.plot(index + bar_width/2, gw_runtimes, label='GW Trend', color='orange', marker='o')
 
     if log3:
-        # Set y-axis to log scale (default base 10)
         plt.yscale('log')
-
-        # Convert y-tick labels to base 3 log
         ax = plt.gca()
         y_vals = ax.get_yticks()
         ax.set_yticklabels([f"{np.log(val)/np.log(3):.2f}" if val > 0 else '0' for val in y_vals])
 
     plt.xlabel('Number of Edges')
-    plt.ylabel('Average Runtime (seconds)')
-    plt.title('Runtime vs Complexity for Different Numbers of Edges' + (' (log3 Y-axis)' if log3 else ''))
+    plt.ylabel('Average Runtime' + (' (log3)' if log3 else ''))
+    plt.title('Runtime vs Complexity for Different Numbers of Edges with Trend Lines')
     plt.xticks(index, edge_values)
     plt.legend()
     plt.grid(True)
@@ -220,15 +295,15 @@ def plot_complexity_runtime_bar_chart(log3=False):
 
 
 def max_cuts_comparison():
-    max_K = 10
+    max_K = 7
     edge_values = [2**k for k in range(1, max_K + 1)]
     accuracies = []
 
     for num_of_edges in edge_values:
         print(f"Processing {num_of_edges} edges...", end='\r')
         accuracy_sum = 0
-        run_times = 5
-        for _ in range(run_times):  # Run 10 times for each number of edges
+        run_times = 1
+        for _ in range(run_times): 
             num_of_nodes = calc_num_of_nodes_required(num_of_edges)
             edges = generate_edges(num_of_nodes, num_of_edges)
             
@@ -246,9 +321,9 @@ def max_cuts_comparison():
         average_accuracy = accuracy_sum / run_times
         accuracies.append(average_accuracy)
 
-    # Plotting
+    # Plotting as a bar chart
     plt.figure(figsize=(12, 6))
-    plt.plot(edge_values, accuracies, marker='o', linestyle='-', color='b')
+    plt.bar(edge_values, accuracies, color='b')
     plt.axhline(y=87, color='r', linestyle='--', label='Minimum Expected Accuracy')
     plt.xlabel('Number of Edges')
     plt.ylabel('Accuracy (%)')
@@ -257,7 +332,6 @@ def max_cuts_comparison():
     plt.grid(True)
     plt.legend()
     plt.show()
-
 
 
 def main(algorithm='gw', num_of_nodes=10):
@@ -284,9 +358,16 @@ def main(algorithm='gw', num_of_nodes=10):
     plot_max_cut(edges, cut, runtime, num_of_cuts)
 
 
+def plot_network_edges(num_of_nodes=5):
+    num_of_edges = calc_num_of_edges_required(num_of_nodes)
+    edges = generate_edges(num_of_nodes, num_of_edges)
+    plot_network(edges)
+
+
 if __name__ == "__main__":
-    # main(algorithm='gw', num_of_nodes=50)
+    plot_network_edges(num_of_nodes=5)
+    # main(algorithm='gw', num_of_nodes=98)
     # plot_complexity_runtime_bar_chart(log3=True)
-    max_cuts_comparison()
-    
+    # max_cuts_comparison()
+
     
