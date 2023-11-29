@@ -6,6 +6,7 @@ import random
 import matplotlib.pyplot as plt
 import time
 from scipy.stats import linregress
+from matplotlib.ticker import NullFormatter
 
 def generate_edges(num_of_nodes, num_of_edges):
     if num_of_edges > num_of_nodes * (num_of_nodes - 1) // 2:
@@ -23,13 +24,16 @@ def generate_edges(num_of_nodes, num_of_edges):
     return list(edges)
 
 
-def Goemans_Williamson_max_cut(edges, num_of_nodes):
+def Goemans_Williamson_max_cut(edges):
+    # find number of nodes in max cut graph
+    num_of_nodes = max(max(edge) for edge in edges) + 1
+
     # Create a symmetric matrix variable
     X = cp.Variable((num_of_nodes, num_of_nodes), symmetric=True)
 
     # Constraints
-    constraints = [X >> 0]  # X is positive semidefinite
-    constraints += [X[i, i] == 1 for i in range(num_of_nodes)]  # Diagonals must be 1
+    constraints = [X >> 0]  # Declare matrix X to be positive semidefinite
+    constraints += [X[i, i] == 1 for i in range(num_of_nodes)]  # Since we want unit vectors, set diagonals to 1
 
     # Objective function (Q)
     objective = cp.Maximize(sum(0.5 * (1 - X[i, j]) for i, j in edges))
@@ -39,16 +43,17 @@ def Goemans_Williamson_max_cut(edges, num_of_nodes):
     prob.solve()
     X_solution = X.value
 
+    # Finding the sqrt of the matrix X produces the vectors of the nodes given by the relaxed problem (P)
+    x_projected = sp.linalg.sqrtm(X_solution)
+
     # Generate a random hyperplane
     u = np.random.randn(num_of_nodes)
 
     # Project onto the hyperplane and classify
-    # Finding the sqrt of the matrix X produces the vectors of the nodes given by the relaxed problem (P)
-    x_projected = sp.linalg.sqrtm(X_solution)
     cut = np.sign(x_projected @ u)
-    cut = cut.real.astype(np.int32)
-
-    return cut
+    
+    # cut should not have any imaginary component, so no data is lost here
+    return cut.real
 
 
 def brute_force_max_cut(edges, num_of_nodes):
@@ -189,7 +194,7 @@ def measure_runtime_comparison(num_of_nodes, num_of_edges):
 
     total_brute_force_runtime = 0
     total_gw_runtime = 0
-    num_runs = 10
+    num_runs = 5
 
     for _ in range(num_runs):
         start_time = time.time()
@@ -197,7 +202,7 @@ def measure_runtime_comparison(num_of_nodes, num_of_edges):
         total_brute_force_runtime += time.time() - start_time
 
         start_time = time.time()
-        Goemans_Williamson_max_cut(edges, num_of_nodes)
+        Goemans_Williamson_max_cut(edges)
         total_gw_runtime += time.time() - start_time
 
     average_brute_force_runtime = total_brute_force_runtime / num_runs
@@ -249,24 +254,22 @@ def plot_complexity_runtime_graph():
 
 
 def plot_complexity_runtime_bar_chart(log3=False):
-    max_K = 5
+    max_K = 7
     edge_values = [2**k for k in range(1, max_K + 1)]
     brute_force_runtimes = []
     gw_runtimes = []
-    num_iterations = 10  # Number of times to run each edge calculation
 
     for num_of_edges in edge_values:
         print(f"Processing {num_of_edges} edges...")
         bf_runtime_total, gw_runtime_total = 0, 0
 
-        for _ in range(num_iterations):
-            bf_runtime, gw_runtime = measure_runtime_comparison(calc_num_of_nodes_required(num_of_edges), num_of_edges)
-            bf_runtime_total += bf_runtime
-            gw_runtime_total += gw_runtime
+        bf_runtime, gw_runtime = measure_runtime_comparison(calc_num_of_nodes_required(num_of_edges), num_of_edges)
+        bf_runtime_total += bf_runtime
+        gw_runtime_total += gw_runtime
 
         # Calculate the average runtime over the iterations
-        brute_force_runtimes.append(bf_runtime_total / num_iterations)
-        gw_runtimes.append(gw_runtime_total / num_iterations)
+        brute_force_runtimes.append(bf_runtime_total)
+        gw_runtimes.append(gw_runtime_total)
 
     bar_width = 0.35
     index = np.array(range(len(edge_values)))
@@ -276,8 +279,8 @@ def plot_complexity_runtime_bar_chart(log3=False):
     plt.bar(index + bar_width/2, gw_runtimes, bar_width, label='Goemans-Williamson')
 
     # Adding trend lines for Brute Force and GW methods
-    plt.plot(index - bar_width/2, brute_force_runtimes, label='Brute Force Trend', color='blue', marker='o')
-    plt.plot(index + bar_width/2, gw_runtimes, label='GW Trend', color='orange', marker='o')
+    plt.plot(index - bar_width/2, brute_force_runtimes, color='blue', marker='o')
+    plt.plot(index + bar_width/2, gw_runtimes, color='orange', marker='o')
 
     if log3:
         plt.yscale('log')
@@ -285,10 +288,11 @@ def plot_complexity_runtime_bar_chart(log3=False):
         y_vals = ax.get_yticks()
         ax.set_yticklabels([f"{np.log(val)/np.log(3):.2f}" if val > 0 else '0' for val in y_vals])
 
-    plt.xlabel('Number of Edges')
-    plt.ylabel('Average Runtime' + (' (log3)' if log3 else ''))
-    plt.title('Runtime vs Complexity for Different Numbers of Edges with Trend Lines')
-    plt.xticks(index, edge_values)
+    plt.xlabel('Number of Edges', fontsize=14)
+    plt.ylabel('Average Relative Runtime' + (' (log3)' if log3 else ''), fontsize=14)
+    plt.title('Runtime vs Complexity for Different Numbers of Edges with Trend Lines', fontsize=14)
+    plt.xticks(index, edge_values, fontsize=14)
+    plt.gca().yaxis.set_major_formatter(NullFormatter())
     plt.legend()
     plt.grid(True)
     plt.show()
@@ -302,7 +306,7 @@ def max_cuts_comparison():
     for num_of_edges in edge_values:
         print(f"Processing {num_of_edges} edges...", end='\r')
         accuracy_sum = 0
-        run_times = 1
+        run_times = 5
         for _ in range(run_times): 
             num_of_nodes = calc_num_of_nodes_required(num_of_edges)
             edges = generate_edges(num_of_nodes, num_of_edges)
@@ -310,7 +314,7 @@ def max_cuts_comparison():
             cuts_brute = brute_force_max_cut(edges, num_of_nodes)
             max_cuts_brute = calc_num_of_cuts(edges, cuts_brute)
 
-            cuts_gw = Goemans_Williamson_max_cut(edges, num_of_nodes)
+            cuts_gw = Goemans_Williamson_max_cut(edges)
             max_cuts_gw = calc_num_of_cuts(edges, cuts_gw)
 
             # Calculate the accuracy as a percentage
@@ -323,12 +327,21 @@ def max_cuts_comparison():
 
     # Plotting as a bar chart
     plt.figure(figsize=(12, 6))
-    plt.bar(edge_values, accuracies, color='b')
-    plt.axhline(y=87, color='r', linestyle='--', label='Minimum Expected Accuracy')
+
+    # Positions for the bars
+    blue_bar_positions = [x - 0.2 for x in range(len(edge_values))]
+    orange_bar_positions = [x + 0.2 for x in range(len(edge_values))]
+
+    # Plotting the bars
+    plt.bar(orange_bar_positions, [100] * len(edge_values),  width=0.35, label='Brute Force')
+    plt.bar(blue_bar_positions, accuracies, width=0.35, label='Goemans-Williamson')
+
+    plt.axhline(y=87, color='red', linestyle='--', label='Minimum Expected Accuracy')
     plt.xlabel('Number of Edges')
     plt.ylabel('Accuracy (%)')
     plt.title('Accuracy of Goemans-Williamson Algorithm Compared to Brute Force')
-    plt.ylim(0, 100)  # Set y-axis limits
+    plt.xticks(range(len(edge_values)), edge_values)
+    plt.ylim(0, 110)  # Set y-axis limits
     plt.grid(True)
     plt.legend()
     plt.show()
@@ -345,7 +358,7 @@ def main(algorithm='gw', num_of_nodes=10):
     start_time = time.time()
 
     if algorithm == 'gw':
-        cut = Goemans_Williamson_max_cut(edges, num_of_nodes)
+        cut = Goemans_Williamson_max_cut(edges)
     else:
         cut = brute_force_max_cut(edges, num_of_nodes)
 
@@ -365,9 +378,7 @@ def plot_network_edges(num_of_nodes=5):
 
 
 if __name__ == "__main__":
-    plot_network_edges(num_of_nodes=5)
+    # plot_network_edges(num_of_nodes=5)
     # main(algorithm='gw', num_of_nodes=98)
     # plot_complexity_runtime_bar_chart(log3=True)
-    # max_cuts_comparison()
-
-    
+    max_cuts_comparison()
